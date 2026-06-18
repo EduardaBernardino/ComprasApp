@@ -13,73 +13,87 @@ import { compraService, HistoricoCompra } from '../../services/compraService';
 
 export default function HistoryScreen() {
   const navigation = useNavigation<any>();
-  // Estado que armazena o array com o histórico de compras do usuário
+  // Estado local que armazena a lista com os registros de compras passadas obtidas do banco
   const [historico, setHistorico] = useState<HistoricoCompra[]>([]);
 
-  // --- BUSCA DOS DADOS ---
+  // Hook de ciclo de vida que busca o histórico assim que o componente é inserido na tela
   useEffect(() => {
     const usuario = auth.currentUser;
     if (usuario) {
-      // Obtém as compras filtradas pelo ID do usuário autenticado e salva no estado
-      const dados = compraService.listarHistorico(usuario.uid);
-      setHistorico(dados);
+      /**
+       * Chamada assíncrona baseada em Promises utilizando listarHistoricoAsync.
+       * Este método abstrai o mecanismo de leitura unificando o comportamento tanto para a Web
+       * quanto para o armazenamento local de dispositivos móveis.
+       */
+      compraService.listarHistoricoAsync(usuario.uid).then(dados => {
+        setHistorico(dados); // Popula o estado com o array retornado
+      });
     }
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* CABEÇALHO */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>← Voltar</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>← Voltar</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Histórico</Text>
+          {/* Botão direcionador para a tela de relatórios analíticos em formato gráfico */}
+          <TouchableOpacity
+              style={styles.chartButton}
+              onPress={() => navigation.navigate('HistoryChart')}
+          >
+            <Text style={styles.chartButtonText}>📊 Gráfico</Text>
+          </TouchableOpacity>
+        </View>
 
-        <Text style={styles.title}>Histórico</Text>
+        {/* Componente otimizado para renderização eficiente de listas lineares */}
+        <FlatList
+            data={historico}
+            keyExtractor={(item) => String(item.id)} // Converte o identificador numérico em String para indexação interna do React
+            contentContainerStyle={{ paddingHorizontal: 15, paddingBottom: 20 }}
+            renderItem={({ item }) => (
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.dateBadge}>
+                      <Text style={styles.dateText}>📅 {item.dataCompra}</Text>
+                    </View>
+                    {/* Exibição gramatical condicional de acordo com o volume de itens */}
+                    <Text style={styles.itemCountText}>
+                      {item.quantidadeItens} {item.quantidadeItens === 1 ? 'produto' : 'produtos'}
+                    </Text>
+                  </View>
 
-        {/* Redireciona o usuário para a tela que renderiza o gráfico de gastos */}
-        <TouchableOpacity
-          style={styles.chartButton}
-          onPress={() => navigation.navigate('HistoryChart')}
-        >
-          <Text style={styles.chartButtonText}>📊 Gráfico</Text>
-        </TouchableOpacity>
-      </View>
+                  <View style={styles.divider} />
 
-      {/* --- RENDERIZAÇÃO DA LISTA --- */}
-      <FlatList
-        data={historico} // Array de dados que alimenta a lista
-        keyExtractor={(item) => String(item.id)} // Define uma chave única (string) para cada item otimizar a performance
-        contentContainerStyle={{ paddingHorizontal: 15, paddingBottom: 20 }}
-        renderItem={({ item }) => (
-          // Componente visual (Card) repetido para cada compra do array
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.dateBadge}>
-                <Text style={styles.dateText}>📅 {item.dataCompra}</Text>
+                  {/**
+                   * Renderização Condicional:
+                   * O badge vermelho de aviso de divergência financeira só será montado na interface
+                   * caso o valor cobrado a mais no caixa tenha sido superior a zero (item.divergencia > 0).
+                   */}
+                  {item.divergencia > 0 && (
+                      <View style={styles.divergenciaBadge}>
+                        <Text style={styles.divergenciaText}>
+                          ⚠️ Cobrado R$ {item.divergencia.toFixed(2)} a mais no caixa
+                        </Text>
+                      </View>
+                  )}
+
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.totalLabel}>Total da Compra</Text>
+                    <Text style={styles.totalValue}>R$ {item.totalCompra.toFixed(2)}</Text>
+                  </View>
+                </View>
+            )}
+            /* Componente de Fallback: Renderizado automaticamente caso o array de dados esteja vazio */
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>📜</Text>
+                <Text style={styles.emptyText}>Você ainda não fechou nenhuma compra.</Text>
               </View>
-              {/* Tratamento simples no plural/singular baseado na quantidade */}
-              <Text style={styles.itemCountText}>
-                {item.quantidadeItens} {item.quantidadeItens === 1 ? 'produto' : 'produtos'}
-              </Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.cardFooter}>
-              <Text style={styles.totalLabel}>Total da Compra</Text>
-              <Text style={styles.totalValue}>R$ {item.totalCompra.toFixed(2)}</Text>
-            </View>
-          </View>
-        )}
-        // Componente exibido automaticamente pela FlatList caso o array 'historico' esteja vazio
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📜</Text>
-            <Text style={styles.emptyText}>Você ainda não fechou nenhuma compra.</Text>
-          </View>
-        }
-      />
-    </SafeAreaView>
+            }
+        />
+      </SafeAreaView>
   );
 }
 
@@ -89,18 +103,20 @@ const styles = StyleSheet.create({
   backButton: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.1)' },
   backButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   title: { fontSize: 18, fontWeight: '700', color: '#fff', textAlign: 'center' },
+  chartButton: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.15)' },
+  chartButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   card: { backgroundColor: '#fff', padding: 16, borderRadius: 14, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 3.84, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateBadge: { backgroundColor: '#f1f5f9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
   dateText: { fontSize: 13, fontWeight: '600', color: '#475569' },
   itemCountText: { fontSize: 14, fontWeight: '500', color: '#64748b' },
   divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 12 },
+  divergenciaBadge: { backgroundColor: '#fee2e2', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 10, alignSelf: 'stretch' },
+  divergenciaText: { fontSize: 12, fontWeight: '600', color: '#991b1b' },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontSize: 13, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
   totalValue: { fontSize: 18, fontWeight: '700', color: '#0f766e' },
   emptyContainer: { alignItems: 'center', marginTop: 80, paddingHorizontal: 40 },
   emptyIcon: { fontSize: 45, marginBottom: 12 },
   emptyText: { textAlign: 'center', color: '#94a3b8', fontSize: 15 },
-  chartButton: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.15)' },
-  chartButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });

@@ -1,66 +1,31 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+// Importação do AsyncStorage, usado para persistência de dados local (chave-valor) no dispositivo
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-<<<<<<< HEAD
-let dbLocal: SQLite.SQLiteDatabase | null = null;
-=======
-// Abre ou cria o arquivo de banco de dados físico no armazenamento local do dispositivo
-const dbLocal = SQLite.openDatabaseSync('comprasApp.db');
->>>>>>> 75b3296f34bbd9a594054ae73e85703037f8d8b9
+/**
+ * Centralização das Chaves do AsyncStorage.
+ * Organiza e isola os dados criando chaves dinâmicas baseadas no ID do usuário (userId).
+ * Isso garante que múltiplos usuários possam usar o mesmo aparelho sem misturar seus carrinhos e históricos.
+ */
+export const KEYS = {
+  // Gera uma chave única para a lista de compras atual do usuário (Ex: "compras_abc123")
+  compras: (userId: string) => `compras_${userId}`,
 
-// Substituímos o openDatabaseSync pelo openDatabaseAsync
-export async function getDatabase() {
-  if (!dbLocal) {
-    dbLocal = await SQLite.openDatabaseAsync('comprasApp.db');
-  }
-  return dbLocal;
-}
+  // Gera uma chave única para o histórico de compras fechadas do usuário (Ex: "historico_abc123")
+  historico: (userId: string) => `historico_${userId}`,
 
-// Transformamos a função em assíncrona
+  // Gera uma chave única para listar os itens específicos pertencentes a uma compra passada pelo ID do histórico
+  historicoItens: (historicoId: number) => `historico_itens_${historicoId}`,
+};
+
+/**
+ * Função de Compatibilidade.
+ * Mantida para evitar quebras de código (breaking changes) caso alguma outra parte do aplicativo
+ * (como o App.tsx) ainda tente executar a inicialização que era necessária em versões antigas ou outros bancos de dados.
+ */
 export async function inicializarBancoLocal() {
-  try {
-<<<<<<< HEAD
-    const db = await getDatabase();
-    // Substituímos execSync por execAsync
-    await db.execAsync(`
-=======
-    // Executa em lote (batch) a configuração e criação das tabelas essenciais
-    dbLocal.execSync(`
-      -- Ativa o modo Write-Ahead Logging (WAL) para otimizar a concorrência e velocidade de escrita/leitura
->>>>>>> 75b3296f34bbd9a594054ae73e85703037f8d8b9
-      PRAGMA journal_mode = WAL;
-
-      -- TABELA: compras (Armazena o carrinho ativo atual de cada usuário)
-      CREATE TABLE IF NOT EXISTS compras (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId TEXT NOT NULL,
-        nome TEXT NOT NULL,
-        fotoUrl TEXT,
-        precoUnitario REAL NOT NULL,
-        quantidade INTEGER NOT NULL,
-        totalItem REAL NOT NULL
-      );
-
-      -- TABELA: historico_compras (Registro mestre/cabeçalho de fechamento da compra)
-      CREATE TABLE IF NOT EXISTS historico_compras (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId TEXT NOT NULL,
-        dataCompra TEXT NOT NULL,
-        totalCompra REAL NOT NULL,
-        quantidadeItens INTEGER NOT NULL
-      );
-
-      -- TABELA: historico_itens (Itens vinculados a uma compra fechada - Relacionamento 1:N)
-      CREATE TABLE IF NOT EXISTS historico_itens (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        historicoId INTEGER NOT NULL, -- Atua como a chave estrangeira vinculada a historico_compras(id)
-        nome TEXT NOT NULL,
-        precoUnitario REAL NOT NULL,
-        quantidade INTEGER NOT NULL,
-        totalItem REAL NOT NULL
-      );
-    `);
-    console.log("Tabela 'compras' validada/criada com sucesso no SQLite.");
-  } catch (error) {
-    console.error("Erro crítico ao criar tabela SQLite:", error);
-  }
+  console.log('AsyncStorage pronto — sem necessidade de inicialização.');
 }
+
+// Exportação padrão do objeto de chaves para facilitar a importação limpa em outros arquivos
+export default KEYS;
